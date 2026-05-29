@@ -2,9 +2,10 @@ import os
 import sys
 import json
 import asyncio
+import shutil
 from http.server import BaseHTTPRequestHandler
 
-# Силовое обновление движка yt-dlp в оперативной памяти Vercel при старте
+# Обновление движка в оперативной памяти
 try:
     import pip
     pip.main(['install', '--upgrade', 'yt-dlp'])
@@ -32,8 +33,15 @@ async def process_update(update_dict):
                     text="Секунду, извлекаю видеопоток..."
                 )
                 
-                # Путь к файлу куки, который вы создали на GitHub
-                cookies_path = 'cookies.txt' if os.path.exists('cookies.txt') else None
+                # ИСПРАВЛЕНО: Копируем cookies.txt во временную папку /tmp, где разрешена запись
+                cookies_path = None
+                if os.path.exists('cookies.txt'):
+                    tmp_cookies = '/tmp/cookies.txt'
+                    try:
+                        shutil.copyfile('cookies.txt', tmp_cookies)
+                        cookies_path = tmp_cookies
+                    except:
+                        cookies_path = 'cookies.txt'
                 
                 ydl_opts = {
                     'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 
@@ -41,7 +49,7 @@ async def process_update(update_dict):
                     'no_warnings': True,
                     'nocheckcertificate': True,
                     'cachedir': False,
-                    'cookiefile': cookies_path  # ИСПРАВЛЕНО: Бот теперь использует ваши куки для обхода 18+
+                    'cookiefile': cookies_path  # Используем безопасный путь
                 }
                 
                 try:
