@@ -1,40 +1,72 @@
 import os
+import sys
 import json
 import asyncio
+import urllib.request
 from http.server import BaseHTTPRequestHandler
+
+# Принудительно обновляем библиотеки
+os.system(f"{sys.executable} -m pip install --upgrade pip yt-dlp python-telegram-bot")
+
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application
 
 TOKEN = "7723448271:AAGhveA6kARIklu21qsKCtNU7uZ0DclMfm8"
+WEBHOOK_URL = "https://vercel.app"
+
+# АВТОМАТИЧЕСКАЯ СВЯЗКА (Выполняется самим сервером Vercel в обход блокировок ПК)
+try:
+    link = f"https://telegram.org{TOKEN}/setWebhook?url={WEBHOOK_URL}"
+    urllib.request.urlopen(link)
+    print("Связка успешно активирована сервером!")
+except Exception as e:
+    print(f"Ошибка активации: {e}")
 
 async def process_update(update_dict):
     app = Application.builder().token(TOKEN).build()
     await app.initialize()
     
-    update = Update.de_json(update_dict, app.bot)
-    if update and update.message and update.message.text:
-        url = update.message.text
-        if url.startswith("http"):
-            # Быстро извлекаем прямую ссылку через yt-dlp
-            ydl_opts = {'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 'quiet': True}
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    direct_url = info.get('url') or info.get('formats', [{}])[-1].get('url')
-                    title = info.get('title', 'Видео')
+    try:
+        update = Update.de_json(update_dict, app.bot)
+        if update and update.message and update.message.text:
+            url = update.message.text.strip()
+            
+            if url.startswith("http"):
+                status_msg = await app.bot.send_message(chat_id=update.message.chat_id, text="Секунду, извлекаю видеопоток...")
                 
-                if direct_url:
-                    keyboard = [[InlineKeyboardButton("📥 Скачать видеофайл", url=direct_url)]]
-                    markup = InlineKeyboardMarkup(keyboard)
-                    await app.bot.send_message(
-                        chat_id=update.message.chat_id,
-                        text=f"🎬 *{title}*\n\nСсылка готова! Нажмите кнопку ниже для скачивания:",
-                        reply_markup=markup,
-                        parse_mode="Markdown"
-                    )
-            except Exception as e:
-                await app.bot.send_message(chat_id=update.message.chat_id, text="Ошибка обработки ссылки.")
+                ydl_opts = {
+                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 
+                    'quiet': True,
+                    'no_warnings': True
+                }
+                
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        direct_url = info.get('url') or info.get('formats', [{}])[-1].get('url')
+                        title = info.get('title', 'Видео')
+                    
+                    if direct_url:
+                        keyboard = [[InlineKeyboardButton("📥 Скачать видеофайл", url=direct_url)]]
+                        markup = InlineKeyboardMarkup(keyboard)
+                        
+                        await app.bot.delete_message(chat_id=update.message.chat_id, message_id=status_msg.message_id)
+                        await app.bot.send_message(
+                            chat_id=update.message.chat_id,
+                            text=f"🎬 *{title}*\n\nФайл успешно подготовлен! Нажмите на кнопку ниже, чтобы сохранить его на телефон:",
+                            reply_markup=markup,
+                            parse_mode="Markdown"
+                        )
+                    else:
+                        await app.bot.edit_message_text(chat_id=update.message.chat_id, message_id=status_msg.message_id, text="Не удалось извлечь прямую ссылку.")
+                
+                except Exception as e_ydl:
+                    await app.bot.edit_message_text(chat_id=update.message.chat_id, message_id=status_msg.message_id, text=f"Ошибка движка yt-dlp: {str(e_ydl)[:100]}")
+    
+    except Exception as e_global:
+        print(f"Глобальная ошибка: {str(e_global)}")
+        
     await app.shutdown()
 
 class handler(BaseHTTPRequestHandler):
@@ -43,7 +75,6 @@ class handler(BaseHTTPRequestHandler):
         post_data = self.rfile.read(content_length)
         update_dict = json.loads(post_data.decode('utf-8'))
         
-        # Запускаем асинхронную обработку сообщения от Telegram
         asyncio.run(process_update(update_dict))
         
         self.send_response(200)
