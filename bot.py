@@ -5,7 +5,7 @@ import asyncio
 import shutil
 from http.server import BaseHTTPRequestHandler
 
-# Обновление движка в оперативной памяти
+# Обновление движка в оперативной памяти Vercel
 try:
     import pip
     pip.main(['install', '--upgrade', 'yt-dlp'])
@@ -33,7 +33,7 @@ async def process_update(update_dict):
                     text="Секунду, извлекаю видеопоток..."
                 )
                 
-                # ИСПРАВЛЕНО: Копируем cookies.txt во временную папку /tmp, где разрешена запись
+                # Безопасное копирование cookies.txt во временную папку /tmp
                 cookies_path = None
                 if os.path.exists('cookies.txt'):
                     tmp_cookies = '/tmp/cookies.txt'
@@ -43,8 +43,8 @@ async def process_update(update_dict):
                     except:
                         cookies_path = 'cookies.txt'
                 
-                                ydl_opts = {
-                    # ИСПРАВЛЕНО: выбирает вообще любой самый лучший поток видео и аудио, без привязки к mp4
+                # ИСПРАВЛЕНО: Полностью всеядный формат для любых сайтов
+                ydl_opts = {
                     'format': 'bestvideo+bestaudio/best', 
                     'quiet': True,
                     'no_warnings': True,
@@ -52,7 +52,6 @@ async def process_update(update_dict):
                     'cachedir': False,
                     'cookiefile': cookies_path
                 }
-
                 
                 try:
                     loop = asyncio.get_event_loop()
