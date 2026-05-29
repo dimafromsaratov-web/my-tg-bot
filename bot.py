@@ -1,7 +1,16 @@
 import os
+import sys
 import json
 import asyncio
 from http.server import BaseHTTPRequestHandler
+
+# Силовое обновление движка yt-dlp прямо в оперативной памяти Vercel при старте запроса
+try:
+    import pip
+    pip.main(['install', '--upgrade', 'yt-dlp'])
+except:
+    os.system(f"{sys.executable} -m pip install --upgrade yt-dlp")
+
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application
@@ -18,24 +27,20 @@ async def process_update(update_dict):
             url = update.message.text.strip()
             
             if url.startswith("http"):
-                # Отправляем сообщение-статус пользователю
                 status_msg = await app.bot.send_message(
                     chat_id=update.message.chat_id, 
                     text="Секунду, извлекаю видеопоток..."
                 )
                 
-                # ИСПРАВЛЕНО: Жесткие настройки yt-dlp без использования диска сервера
                 ydl_opts = {
                     'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 
                     'quiet': True,
                     'no_warnings': True,
-                    'extract_flat': False,
                     'nocheckcertificate': True,
-                    'cachedir': False  # Запрещаем забивать кэш на защищенном диске Vercel
+                    'cachedir': False
                 }
                 
                 try:
-                    # Запускаем извлечение информации в фоновом потоке
                     loop = asyncio.get_event_loop()
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         info = await loop.run_in_executor(
@@ -50,7 +55,6 @@ async def process_update(update_dict):
                         keyboard = [[InlineKeyboardButton("📥 Скачать видеофайл", url=direct_url)]]
                         markup = InlineKeyboardMarkup(keyboard)
                         
-                        # Удаляем статус «Секунду...» и присылаем готовую кнопку
                         await app.bot.delete_message(
                             chat_id=update.message.chat_id, 
                             message_id=status_msg.message_id
@@ -69,10 +73,12 @@ async def process_update(update_dict):
                         )
                 
                 except Exception as e_ydl:
+                    # Если всё равно ошибка, бот честно пришлет её технический текст в чат для проверки
+                    error_text = str(e_ydl)[:150]
                     await app.bot.edit_message_text(
                         chat_id=update.message.chat_id, 
                         message_id=status_msg.message_id, 
-                        text=f"Ошибка дешифрации видео сервером."
+                        text=f"Ошибка дешифрации: {error_text}"
                     )
     except Exception as e_global:
         print(f"Ошибка: {e_global}")
