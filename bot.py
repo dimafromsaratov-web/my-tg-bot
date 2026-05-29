@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+from http.server import BaseHTTPRequestHandler
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application
@@ -17,18 +18,31 @@ async def process_update(update_dict):
             url = update.message.text.strip()
             
             if url.startswith("http"):
-                # Бот подает признак жизни
-                status_msg = await app.bot.send_message(chat_id=update.message.chat_id, text="Секунду, извлекаю видеопоток...")
+                # Отправляем сообщение-статус пользователю
+                status_msg = await app.bot.send_message(
+                    chat_id=update.message.chat_id, 
+                    text="Секунду, извлекаю видеопоток..."
+                )
                 
+                # ИСПРАВЛЕНО: Жесткие настройки yt-dlp без использования диска сервера
                 ydl_opts = {
                     'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 
                     'quiet': True,
-                    'no_warnings': True
+                    'no_warnings': True,
+                    'extract_flat': False,
+                    'nocheckcertificate': True,
+                    'cachedir': False  # Запрещаем забивать кэш на защищенном диске Vercel
                 }
                 
                 try:
+                    # Запускаем извлечение информации в фоновом потоке
+                    loop = asyncio.get_event_loop()
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        info = ydl.extract_info(url, download=False)
+                        info = await loop.run_in_executor(
+                            None, 
+                            lambda: ydl.extract_info(url, download=False)
+                        )
+                        
                         direct_url = info.get('url') or info.get('formats', [{}])[-1].get('url')
                         title = info.get('title', 'Видео')
                     
@@ -36,7 +50,11 @@ async def process_update(update_dict):
                         keyboard = [[InlineKeyboardButton("📥 Скачать видеофайл", url=direct_url)]]
                         markup = InlineKeyboardMarkup(keyboard)
                         
-                        await app.bot.delete_message(chat_id=update.message.chat_id, message_id=status_msg.message_id)
+                        # Удаляем статус «Секунду...» и присылаем готовую кнопку
+                        await app.bot.delete_message(
+                            chat_id=update.message.chat_id, 
+                            message_id=status_msg.message_id
+                        )
                         await app.bot.send_message(
                             chat_id=update.message.chat_id,
                             text=f"🎬 *{title}*\n\nФайл успешно подготовлен! Нажмите на кнопку ниже, чтобы сохранить его на телефон:",
@@ -44,10 +62,18 @@ async def process_update(update_dict):
                             parse_mode="Markdown"
                         )
                     else:
-                        await app.bot.edit_message_text(chat_id=update.message.chat_id, message_id=status_msg.message_id, text="Не удалось получить прямую ссылку.")
+                        await app.bot.edit_message_text(
+                            chat_id=update.message.chat_id, 
+                            message_id=status_msg.message_id, 
+                            text="Не удалось получить прямую ссылку."
+                        )
                 
                 except Exception as e_ydl:
-                    await app.bot.edit_message_text(chat_id=update.message.chat_id, message_id=status_msg.message_id, text=f"Ошибка обработки ссылки движком.")
+                    await app.bot.edit_message_text(
+                        chat_id=update.message.chat_id, 
+                        message_id=status_msg.message_id, 
+                        text=f"Ошибка дешифрации видео сервером."
+                    )
     except Exception as e_global:
         print(f"Ошибка: {e_global}")
         
