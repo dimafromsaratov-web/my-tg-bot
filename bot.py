@@ -1,18 +1,7 @@
-import os
-import sys
 import json
 import asyncio
-import shutil
+import urllib.request
 from http.server import BaseHTTPRequestHandler
-
-# Обновление движка в оперативной памяти Vercel
-try:
-    import pip
-    pip.main(['install', '--upgrade', 'yt-dlp'])
-except:
-    os.system(f"{sys.executable} -m pip install --upgrade yt-dlp")
-
-import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application
 
@@ -30,39 +19,30 @@ async def process_update(update_dict):
             if url.startswith("http"):
                 status_msg = await app.bot.send_message(
                     chat_id=update.message.chat_id, 
-                    text="Секунду, извлекаю видеопоток..."
+                    text="Секунду, извлекаю видеопоток через Cobalt API..."
                 )
                 
-                # Безопасное копирование cookies.txt во временную папку /tmp
-                cookies_path = None
-                if os.path.exists('cookies.txt'):
-                    tmp_cookies = '/tmp/cookies.txt'
-                    try:
-                        shutil.copyfile('cookies.txt', tmp_cookies)
-                        cookies_path = tmp_cookies
-                    except:
-                        cookies_path = 'cookies.txt'
-                
-                # ИСПРАВЛЕНО: Запрашиваем только готовые цельные форматы (без склейки), чтобы обойти сбой
-                ydl_opts = {
-                    'format': 'best', 
-                    'quiet': True,
-                    'no_warnings': True,
-                    'nocheckcertificate': True,
-                    'cachedir': False,
-                    'cookiefile': cookies_path
-                }
-                
                 try:
+                    # Делаем прямой запрос к официальному и стабильному серверу дешифрации v10
+                    api_url = "https://cobalt.tools"
+                    headers = {
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    }
+                    data = json.dumps({
+                        "url": url,
+                        "videoQuality": "1080",
+                        "downloadMode": "video"
+                    }).encode("utf-8")
+                    
+                    req = urllib.request.Request(api_url, data=data, headers=headers, method="POST")
+                    
+                    # Получаем ответ от сервера в фоновом режиме, чтобы бот не зависал
                     loop = asyncio.get_event_loop()
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        info = await loop.run_in_executor(
-                            None, 
-                            lambda: ydl.extract_info(url, download=False)
-                        )
-                        
-                        direct_url = info.get('url') or info.get('formats', [{}])[-1].get('url')
-                        title = info.get('title', 'Видео')
+                    response = await loop.run_in_executor(None, lambda: urllib.request.urlopen(req).read())
+                    res_json = json.loads(response.decode("utf-8"))
+                    
+                    direct_url = res_json.get("url")
                     
                     if direct_url:
                         keyboard = [[InlineKeyboardButton("📥 Скачать видеофайл", url=direct_url)]]
@@ -74,23 +54,23 @@ async def process_update(update_dict):
                         )
                         await app.bot.send_message(
                             chat_id=update.message.chat_id,
-                            text=f"🎬 *{title}*\n\nФайл успешно подготовлен! Нажмите на кнопку ниже, чтобы сохранить его на телефон:",
+                            text="🎬 *Файл успешно подготовлен!*\n\nНажмите на кнопку ниже, чтобы сохранить его на телефон в максимальном качестве:",
                             reply_markup=markup,
                             parse_mode="Markdown"
                         )
                     else:
+                        error_msg = res_json.get("text", "Не удалось извлечь ссылку.")
                         await app.bot.edit_message_text(
                             chat_id=update.message.chat_id, 
                             message_id=status_msg.message_id, 
-                            text="Не удалось получить прямую ссылку."
+                            text=f"Сервер отклонил запрос: {error_msg}"
                         )
                 
-                except Exception as e_ydl:
-                    error_text = str(e_ydl)[:150]
+                except Exception as e_api:
                     await app.bot.edit_message_text(
                         chat_id=update.message.chat_id, 
                         message_id=status_msg.message_id, 
-                        text=f"Ошибка дешифрации: {error_text}"
+                        text=f"Ошибка шлюза обработки. Попробуйте другую ссылку."
                     )
     except Exception as e_global:
         print(f"Ошибка: {e_global}")
