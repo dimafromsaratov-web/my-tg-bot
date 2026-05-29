@@ -43,14 +43,16 @@ async def process_update(update_dict):
                     except:
                         cookies_path = 'cookies.txt'
                 
-                ydl_opts = {
-                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 
+                                ydl_opts = {
+                    # ИСПРАВЛЕНО: выбирает вообще любой самый лучший поток видео и аудио, без привязки к mp4
+                    'format': 'bestvideo+bestaudio/best', 
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
                     'cachedir': False,
-                    'cookiefile': cookies_path  # Используем безопасный путь
+                    'cookiefile': cookies_path
                 }
+
                 
                 try:
                     loop = asyncio.get_event_loop()
