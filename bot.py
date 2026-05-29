@@ -4,7 +4,7 @@ import json
 import asyncio
 from http.server import BaseHTTPRequestHandler
 
-# Силовое обновление движка yt-dlp прямо в оперативной памяти Vercel при старте запроса
+# Силовое обновление движка yt-dlp в оперативной памяти Vercel при старте
 try:
     import pip
     pip.main(['install', '--upgrade', 'yt-dlp'])
@@ -32,12 +32,16 @@ async def process_update(update_dict):
                     text="Секунду, извлекаю видеопоток..."
                 )
                 
+                # Путь к файлу куки, который вы создали на GitHub
+                cookies_path = 'cookies.txt' if os.path.exists('cookies.txt') else None
+                
                 ydl_opts = {
                     'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
-                    'cachedir': False
+                    'cachedir': False,
+                    'cookiefile': cookies_path  # ИСПРАВЛЕНО: Бот теперь использует ваши куки для обхода 18+
                 }
                 
                 try:
@@ -73,7 +77,6 @@ async def process_update(update_dict):
                         )
                 
                 except Exception as e_ydl:
-                    # Если всё равно ошибка, бот честно пришлет её технический текст в чат для проверки
                     error_text = str(e_ydl)[:150]
                     await app.bot.edit_message_text(
                         chat_id=update.message.chat_id, 
