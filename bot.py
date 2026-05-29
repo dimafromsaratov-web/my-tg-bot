@@ -43,9 +43,9 @@ async def process_update(update_dict):
                     except:
                         cookies_path = 'cookies.txt'
                 
-                # ИСПРАВЛЕНО: Полностью всеядный формат для любых сайтов
+                # ИСПРАВЛЕНО: Запрашиваем только готовые цельные форматы (без склейки), чтобы обойти сбой
                 ydl_opts = {
-                    'format': 'bestvideo+bestaudio/best', 
+                    'format': 'best', 
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
