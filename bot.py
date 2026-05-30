@@ -1,4 +1,4 @@
-pythonimport json
+import json
 import asyncio
 import urllib.request
 from http.server import BaseHTTPRequestHandler
@@ -24,7 +24,7 @@ async def process_update(update_dict):
                 
                 try:
                     # ИСПРАВЛЕНО: Переключено на стабильный, открытый и рабочий сервер-зеркало Cobalt API
-                    api_url = "https://api.cobalt.blackcat.sweeux.org/"
+                    api_url = "https://sweeux.org"
                     headers = {
                         "Accept": "application/json",
                         "Content-Type": "application/json"
