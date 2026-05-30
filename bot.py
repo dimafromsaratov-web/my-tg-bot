@@ -9,7 +9,7 @@ TOKEN = "7723448271:AAGhveA6kARIklu21qsKCtNU7uZ0DclMfm8"
 
 # Список из 5 независимых рабочих серверов-зеркал Cobalt API
 SERVERS = [
-    "https://api.cobalt.tools/",
+    "https://cobalt.tools",
     "https://hyper.lol",
     "https://cgm.rs",
     "https://oak.li",
@@ -33,7 +33,7 @@ async def get_direct_link(url):
     for server in SERVERS:
         try:
             req = urllib.request.Request(server, data=data, headers=headers, method="POST")
-            # Ограничиваем время ожидания сервера 6 секундами, чтобы не ждать долго
+            # Ограничиваем время ожидания сервера 6 секундами
             response = await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=6).read())
             res_json = json.loads(response.decode("utf-8"))
             
@@ -44,10 +44,6 @@ async def get_direct_link(url):
             continue
             
     return None, "Все резервные сервера сейчас перегружены. Попробуйте еще раз через минуту."
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Код оставлен для совместимости, основная логика ниже в process_update
-    pass
 
 async def process_update(update_dict):
     app = Application.builder().token(TOKEN).build()
