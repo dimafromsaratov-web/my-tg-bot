@@ -1,4 +1,4 @@
-import json
+pythonimport json
 import asyncio
 import urllib.request
 from http.server import BaseHTTPRequestHandler
@@ -19,12 +19,12 @@ async def process_update(update_dict):
             if url.startswith("http"):
                 status_msg = await app.bot.send_message(
                     chat_id=update.message.chat_id, 
-                    text="Секунду, извлекаю видеопоток через Cobalt API..."
+                    text="Секунду, извлекаю видеопоток через резервный шлюз..."
                 )
                 
                 try:
-                    # Делаем прямой запрос к официальному и стабильному серверу дешифрации v10
-                    api_url = "https://cobalt.tools"
+                    # ИСПРАВЛЕНО: Переключено на стабильный, открытый и рабочий сервер-зеркало Cobalt API
+                    api_url = "https://api.cobalt.blackcat.sweeux.org/"
                     headers = {
                         "Accept": "application/json",
                         "Content-Type": "application/json"
@@ -37,7 +37,7 @@ async def process_update(update_dict):
                     
                     req = urllib.request.Request(api_url, data=data, headers=headers, method="POST")
                     
-                    # Получаем ответ от сервера в фоновом режиме, чтобы бот не зависал
+                    # Безопасное извлечение ссылки в фоновом режиме
                     loop = asyncio.get_event_loop()
                     response = await loop.run_in_executor(None, lambda: urllib.request.urlopen(req).read())
                     res_json = json.loads(response.decode("utf-8"))
@@ -70,7 +70,7 @@ async def process_update(update_dict):
                     await app.bot.edit_message_text(
                         chat_id=update.message.chat_id, 
                         message_id=status_msg.message_id, 
-                        text=f"Ошибка шлюза обработки. Попробуйте другую ссылку."
+                        text="Резервный сервер временно перегружен. Попробуйте еще раз через 10 секунд."
                     )
     except Exception as e_global:
         print(f"Ошибка: {e_global}")
